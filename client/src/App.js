@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import io from "socket.io-client";
 import "./App.css";
 
-const socket = io("http://192.168.10.2:3001");
+const socket = io("http://192.168.10.3:3001");
 
 const playlog = [];
 // 各音楽の再生位置を保存
@@ -106,16 +106,6 @@ function App() {
             }
             if (typeof(data) === "object" && 'result' in data) {
                 playlog.push(data.result);
-                
-                // CSVデータを送信（平均値を含む）
-                const timestamp = new Date().toISOString();
-                const csvData = {
-                    timestamp: timestamp,
-                    value: data.result,
-                    audioPosition: audioPositions[data.result] || 0,
-                    meanValue: data.meanValue
-                };
-                socket.emit('saveData', csvData);
 
                 // 音楽の切り替え処理
                 switch (data.result) {
