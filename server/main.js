@@ -3,12 +3,12 @@ import net from 'net';
 import express from 'express';
 import http from 'http';
 import { Server as SocketIoServer } from 'socket.io';
-import { calculateMean, StandardDeviation } from './analysis.js';
 import { initializePlaybackCSV, writeM5DataCSV, getTime, csvFiles } from './csvfuncs.js';
+import * as ss from 'simple-statistics';
 
 const WEB_SOCKET_PORT = 3001;
 const TCP_PORT = 3002;
-const HOST = '192.168.10.3'; //IPアドレス
+const HOST = ''; //IPアドレス
 
 const deviceData = {};
 const stdlist = [];
@@ -16,39 +16,8 @@ const stdlist = [];
 // グローバル変数として現在のplayback.csvのパスを保持
 const currentPlaybackCSV = initializePlaybackCSV();
 
-// 一定時間で各デバイスのサンプルエントロピーを計算
-setInterval(() => {
-    Object.keys(deviceData).forEach(id => {
-        const std = StandardDeviation(deviceData[id]);
-        // NaNでない場合のみstdlistに追加
-        if (!(isNaN(std) || std === 0)) {
-            stdlist.push(std);
-        }
-        deviceData[id] = [];
-    });
-    console.log(stdlist);
-    const meanValue = calculateMean(stdlist);
-    stdlist.length = 0;
-    console.log(`mean: `, meanValue);
-    let result;
-    const [value1, value2] = [20, 30];
-    if (meanValue <= value1) {
-        result = 0
-    } else if (meanValue > value1 && value2 >= meanValue) {
-        result = 1;
-    } else if (meanValue > value2) {
-        result = 2;
-    }
-
-    // 結果と平均値を一緒に送信
-    io.emit("data", { result, meanValue });
-    console.log(`result: ${ result }, mean: ${meanValue} : ${getTime()}`);
-
-    // 既存のファイルに追記
-    const csvLine = `${getTime()},${result},${meanValue}\n`;
-    fs.appendFileSync(currentPlaybackCSV, csvLine);
-    console.log('Playback data saved');
-}, 20*1000);
+// クライアント通信の遅延時間
+const DELAY_TIME = 20;
 
 function setupWebSocketServer() {
     const app = express();
@@ -71,13 +40,9 @@ function setupWebSocketServer() {
             console.log('WebSocket client disconnected');
         });
     });
-
-    return io;
 }
 
-function setupTcpServer(io) {
-    let count = 0;
-    const clientData = [];
+function setupTcpServer() {
     const tcpServer = net.createServer(socket => {
         console.log('TCP client connected', getTime());
         
@@ -95,15 +60,12 @@ function setupTcpServer(io) {
 
             //加速度ノルムの計算
             const normAcc = Math.sqrt(receivedAccX * receivedAccX + receivedAccY * receivedAccY + receivedAccZ * receivedAccZ);
-
-            // IDごとにnormAccを格納
-            if (!deviceData[receivedId]) {
-                deviceData[receivedId] = [];
-            }
-            deviceData[receivedId].push(normAcc);
-
             if (receivedId < 101) {
-                clientData.push(normAcc);
+                // IDごとにnormAccを格納
+                if (!deviceData[receivedId]) {
+                    deviceData[receivedId] = [];
+                }
+                deviceData[receivedId].push(normAcc);
                 writeM5DataCSV(m5Time, receivedId, normAcc, receivedAccX, receivedAccY, receivedAccZ);
             }
         });
@@ -128,5 +90,40 @@ function setupTcpServer(io) {
     });
 }
 
+// 一定時間で各デバイスのサンプルエントロピーを計算
+setInterval(() => {
+    Object.keys(deviceData).forEach(id => {
+        const std = Math.sqrt(ss.variance(deviceData[id]));
+        //const median = ss.median(deviceData[id]);
+        // NaNでない場合のみstdlistに追加
+        if (!(isNaN(std) || std === 0)) {
+            stdlist.push(std);
+        }
+        deviceData[id] = [];
+    });
+    console.log(stdlist);
+    const meanValue = ss.mean(stdlist);
+    stdlist.length = 0;
+    console.log(`mean: `, meanValue);
+    let result;
+    const [value1, value2] = [20, 30];
+    if (meanValue <= value1) {
+        result = 0
+    } else if (meanValue > value1 && value2 >= meanValue) {
+        result = 1;
+    } else if (meanValue > value2) {
+        result = 2;
+    }
+
+    // 結果と平均値を一緒に送信
+    io.emit("data", { result, meanValue });
+    console.log(`result: ${ result }, mean: ${meanValue} : ${getTime()}`);
+
+    // 既存のファイルに追記
+    const csvLine = `${getTime()},${result},${meanValue}\n`;
+    fs.appendFileSync(currentPlaybackCSV, csvLine);
+    console.log('Playback data saved');
+}, DELAY_TIME*1000);
+
 const io = setupWebSocketServer();
-setupTcpServer(io);
+setupTcpServer();
