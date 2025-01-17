@@ -60,7 +60,6 @@ function setupTcpServer(io) {
             const receivedAccY = buffer.readFloatLE(8);
             const receivedAccZ = buffer.readFloatLE(12);
             const m5Time = buffer.readFloatLE(16);
-
             //加速度ノルムの計算
             const normAcc = Math.sqrt(receivedAccX * receivedAccX + receivedAccY * receivedAccY + receivedAccZ * receivedAccZ);
             
