@@ -60,13 +60,22 @@ function setupTcpServer() {
 
             //加速度ノルムの計算
             const normAcc = Math.sqrt(receivedAccX * receivedAccX + receivedAccY * receivedAccY + receivedAccZ * receivedAccZ);
+            
+            const m5Data = {
+                id: receivedId,
+                accX: receivedAccX,
+                accY: receivedAccY,
+                accZ: receivedAccZ,
+                normAcc: normAcc,
+                m5Time: m5Time
+            }
+            
             if (receivedId < 101) {
                 // IDごとにnormAccを格納
                 if (!deviceData[receivedId]) {
                     deviceData[receivedId] = [];
                 }
-                deviceData[receivedId].push(normAcc);
-                writeM5DataCSV(m5Time, receivedId, normAcc, receivedAccX, receivedAccY, receivedAccZ);
+                deviceData[receivedId].push(m5Data);
             }
         });
 
@@ -93,7 +102,7 @@ function setupTcpServer() {
 // 一定時間で各デバイスのサンプルエントロピーを計算
 setInterval(() => {
     Object.keys(deviceData).forEach(id => {
-        const std = Math.sqrt(ss.variance(deviceData[id]));
+        const std = ss.standardDeviation(deviceData[id].map(data => data.normAcc));
         //const median = ss.median(deviceData[id]);
         // NaNでない場合のみstdlistに追加
         if (!(isNaN(std) || std === 0)) {
@@ -124,6 +133,15 @@ setInterval(() => {
     fs.appendFileSync(currentPlaybackCSV, csvLine);
     console.log('Playback data saved');
 }, DELAY_TIME*1000);
+
+// 60秒ごとにM5StickのデータをCSVに保存
+setInterval(() => {
+    Object.keys(deviceData).forEach(id => {
+        deviceData[id].forEach(data => {
+            writeM5DataCSV(data.m5Time, data.id, data.normAcc, data.accX, data.accY, data.accZ);
+        });
+    });
+}, 60*1000);
 
 const io = setupWebSocketServer();
 setupTcpServer();
