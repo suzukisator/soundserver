@@ -5,10 +5,12 @@ import http from 'http';
 import { Server as SocketIoServer } from 'socket.io';
 import { initializePlaybackCSV, writeM5DataCSV, getTime, csvFiles } from './csvfuncs.js';
 import * as ss from 'simple-statistics';
+import { getLocalIP } from './getLocalIP.js';
 
 const WEB_SOCKET_PORT = 3001;
 const TCP_PORT = 3002;
-const HOST = ''; //IPアドレス
+const HOST = getLocalIP(); //IPアドレス
+
 
 const deviceData = {};
 const stdlist = [];
@@ -111,25 +113,25 @@ setInterval(() => {
         deviceData[id] = [];
     });
     console.log(stdlist);
-    const meanValue = ss.mean(stdlist);
+    const mean = ss.mean(stdlist);
     stdlist.length = 0;
-    console.log(`mean: `, meanValue);
+    console.log(`mean: `, mean);
     let result;
     const [value1, value2] = [20, 30];
-    if (meanValue <= value1) {
+    if (mean <= value1) {
         result = 0
-    } else if (meanValue > value1 && value2 >= meanValue) {
+    } else if (mean > value1 && value2 >= mean) {
         result = 1;
-    } else if (meanValue > value2) {
+    } else if (mean > value2) {
         result = 2;
     }
 
     // 結果と平均値を一緒に送信
-    io.emit("data", { result, meanValue });
-    console.log(`result: ${ result }, mean: ${meanValue} : ${getTime()}`);
+    io.emit("data", result);
+    console.log(`result: ${ result }, mean: ${mean} : ${getTime()}`);
 
     // 既存のファイルに追記
-    const csvLine = `${getTime()},${result},${meanValue}\n`;
+    const csvLine = `${getTime()},${result},${mean}\n`;
     fs.appendFileSync(currentPlaybackCSV, csvLine);
     console.log('Playback data saved');
 }, DELAY_TIME*1000);
@@ -143,5 +145,5 @@ setInterval(() => {
     });
 }, 60*1000);
 
-const io = setupWebSocketServer();
+setupWebSocketServer();
 setupTcpServer();
