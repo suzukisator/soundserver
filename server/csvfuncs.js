@@ -53,7 +53,7 @@ function initializePlaybackCSV() {
     return filepath;
 }
 
-function writeM5DataCSV(m5Time, receivedId, normAcc, receivedAccX, receivedAccY, receivedAccZ) {
+function writeM5DataCSV(receivedId, m5Time, normAcc, receivedAccX, receivedAccY, receivedAccZ) {
     try {
         const dirPath = path.join(__dirname, ".." ,"csv_data", `${getCSVTime()}`, `Device_${receivedId}`);
         if (!csvFiles[receivedId]) {

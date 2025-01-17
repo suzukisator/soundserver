@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import io from "socket.io-client";
 import "./App.css";
 
-const socket = io("http://192.168.10.3:3001");
+const socket = io("http://localhost:3001");
 
 const playlog = [];
 // 各音楽の再生位置を保存
@@ -54,7 +54,7 @@ function App() {
         }
     };
 
-    function audioCheck(data, music, image) {
+    const audioCheck = (data, music, image) => {
         if (audioRef.current) {
             // 現在の再生位置を保存
             audioPositions[playlog[0]] = audioRef.current.currentTime;
@@ -104,19 +104,18 @@ function App() {
             if (playlog.length >= 2) {
                 playlog.shift();
             }
-            if (typeof(data) === "object" && 'result' in data) {
-                playlog.push(data.result);
+            if (typeof(data) === Number && data >= 0 && data <= 2) {
 
                 // 音楽の切り替え処理
-                switch (data.result) {
+                switch (data) {
                     case 0:
-                        audioCheck(data.result, music0, IMAGE0);
+                        audioCheck(data, music0, IMAGE0);
                         break;
                     case 1:
-                        audioCheck(data.result, music1, IMAGE1);
+                        audioCheck(data, music1, IMAGE1);
                         break;
                     case 2:
-                        audioCheck(data.result, music2, IMAGE2);
+                        audioCheck(data, music2, IMAGE2);
                         break;
                     default:
                         console.log(data);
