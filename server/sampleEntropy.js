@@ -25,33 +25,4 @@ function sampleEntropy(data, m = 2, r = 0.2) {
     return -Math.log(A / B);
 }
 
-// 平均値を計算する関数
-function calculateMean(arr) {
-    if (!arr || arr.length === 0) {
-        return 0;
-    }
-    return arr.reduce((sum, value) => sum + value, 0) / arr.length;
-}
-
-//標準偏差関数
-function StandardDeviation(arr) {
-    const meanValue = calculateMean(arr);
-    const variance = arr.reduce((sum, value) => sum + Math.pow(value - meanValue, 2), 0) / arr.length;
-    const standardDeviation = Math.sqrt(variance);
-    return standardDeviation;
-}
-
-// 中央値関数
-function median(value) {
-    value.sort(function(a, b) {
-        return a - b;
-    });
-    const half = Math.floor(value.length / 2);
-    if (value.length % 2) {
-        return value[half];
-    } else {
-        return (value[half - 1] + value[half]) / 2.0;
-    }
-}
-
-export { sampleEntropy, calculateMean, StandardDeviation };
+export { sampleEntropy };
