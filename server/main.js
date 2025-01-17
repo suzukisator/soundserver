@@ -103,46 +103,54 @@ function setupTcpServer(io) {
 
 // 一定時間で各デバイスのサンプルエントロピーを計算
 setInterval(() => {
-    Object.keys(deviceData).forEach(id => {
-        const std = ss.standardDeviation(deviceData[id].map(data => data.normAcc));
-        //const median = ss.median(deviceData[id]);
-        // NaNでない場合のみstdlistに追加
-        if (!(isNaN(std) || std === 0)) {
-            stdlist.push(std);
+    try {
+        Object.keys(deviceData).forEach(id => {
+            const std = ss.standardDeviation(deviceData[id].map(data => data.normAcc));
+            //const median = ss.median(deviceData[id]);
+            // NaNでない場合のみstdlistに追加
+            if (!(isNaN(std) || std === 0)) {
+                stdlist.push(std);
+            }
+            deviceData[id] = [];
+        });
+        console.log(stdlist);
+        const mean = ss.mean(stdlist);
+        stdlist.length = 0;
+        console.log(`mean: `, mean);
+        let result;
+        const [value1, value2] = [20, 30];
+        if (mean <= value1) {
+            result = 0
+        } else if (mean > value1 && value2 >= mean) {
+            result = 1;
+        } else if (mean > value2) {
+            result = 2;
         }
-        deviceData[id] = [];
-    });
-    console.log(stdlist);
-    const mean = ss.mean(stdlist);
-    stdlist.length = 0;
-    console.log(`mean: `, mean);
-    let result;
-    const [value1, value2] = [20, 30];
-    if (mean <= value1) {
-        result = 0
-    } else if (mean > value1 && value2 >= mean) {
-        result = 1;
-    } else if (mean > value2) {
-        result = 2;
+
+        // 結果と平均値を一緒に送信
+        io.emit("data", result);
+        console.log(`result: ${ result }, mean: ${mean} : ${getTime()}`);
+
+        // 既存のファイルに追記
+        const csvLine = `${getTime()},${result},${mean}\n`;
+        fs.appendFileSync(currentPlaybackCSV, csvLine);
+        console.log('Playback data saved');
+    } catch (error) {
+        console.error('Error in setInterval:', error);
     }
-
-    // 結果と平均値を一緒に送信
-    io.emit("data", result);
-    console.log(`result: ${ result }, mean: ${mean} : ${getTime()}`);
-
-    // 既存のファイルに追記
-    const csvLine = `${getTime()},${result},${mean}\n`;
-    fs.appendFileSync(currentPlaybackCSV, csvLine);
-    console.log('Playback data saved');
 }, DELAY_TIME*1000);
 
 // 60秒ごとにM5StickのデータをCSVに保存
 setInterval(() => {
-    Object.keys(deviceData).forEach(id => {
-        deviceData[id].forEach(data => {
-            writeM5DataCSV(data.m5Time, data.id, data.normAcc, data.accX, data.accY, data.accZ);
+    try {
+        Object.keys(deviceData).forEach(id => {
+            deviceData[id].forEach(data => {
+                writeM5DataCSV(data.m5Time, data.id, data.normAcc, data.accX, data.accY, data.accZ);
+            });
         });
-    });
+    } catch (error) {
+        console.error('Error in setInterval:', error);
+    }
 }, 60*1000);
 
 const io = setupWebSocketServer();
