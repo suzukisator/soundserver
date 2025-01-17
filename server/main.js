@@ -5,10 +5,12 @@ import http from 'http';
 import { Server as SocketIoServer } from 'socket.io';
 import { initializePlaybackCSV, writeM5DataCSV, getTime, csvFiles } from './csvfuncs.js';
 import * as ss from 'simple-statistics';
+import { getLocalIP } from './getLocalIP.js';
 
 const WEB_SOCKET_PORT = 3001;
 const TCP_PORT = 3002;
-const HOST = ''; //IPアドレス
+const HOST = getLocalIP(); //IPアドレス
+
 
 const deviceData = {};
 const stdlist = [];
@@ -40,9 +42,10 @@ function setupWebSocketServer() {
             console.log('WebSocket client disconnected');
         });
     });
+    return io;
 }
 
-function setupTcpServer() {
+function setupTcpServer(io) {
     const tcpServer = net.createServer(socket => {
         console.log('TCP client connected', getTime());
         
@@ -57,16 +60,24 @@ function setupTcpServer() {
             const receivedAccY = buffer.readFloatLE(8);
             const receivedAccZ = buffer.readFloatLE(12);
             const m5Time = buffer.readFloatLE(16);
-
             //加速度ノルムの計算
             const normAcc = Math.sqrt(receivedAccX * receivedAccX + receivedAccY * receivedAccY + receivedAccZ * receivedAccZ);
+            
+            const m5Data = {
+                id: receivedId,
+                accX: receivedAccX,
+                accY: receivedAccY,
+                accZ: receivedAccZ,
+                normAcc: normAcc,
+                m5Time: m5Time
+            }
+            
             if (receivedId < 101) {
                 // IDごとにnormAccを格納
                 if (!deviceData[receivedId]) {
                     deviceData[receivedId] = [];
                 }
-                deviceData[receivedId].push(normAcc);
-                writeM5DataCSV(m5Time, receivedId, normAcc, receivedAccX, receivedAccY, receivedAccZ);
+                deviceData[receivedId].push(m5Data);
             }
         });
 
@@ -93,7 +104,7 @@ function setupTcpServer() {
 // 一定時間で各デバイスのサンプルエントロピーを計算
 setInterval(() => {
     Object.keys(deviceData).forEach(id => {
-        const std = Math.sqrt(ss.variance(deviceData[id]));
+        const std = ss.standardDeviation(deviceData[id].map(data => data.normAcc));
         //const median = ss.median(deviceData[id]);
         // NaNでない場合のみstdlistに追加
         if (!(isNaN(std) || std === 0)) {
@@ -102,28 +113,37 @@ setInterval(() => {
         deviceData[id] = [];
     });
     console.log(stdlist);
-    const meanValue = ss.mean(stdlist);
+    const mean = ss.mean(stdlist);
     stdlist.length = 0;
-    console.log(`mean: `, meanValue);
+    console.log(`mean: `, mean);
     let result;
     const [value1, value2] = [20, 30];
-    if (meanValue <= value1) {
+    if (mean <= value1) {
         result = 0
-    } else if (meanValue > value1 && value2 >= meanValue) {
+    } else if (mean > value1 && value2 >= mean) {
         result = 1;
-    } else if (meanValue > value2) {
+    } else if (mean > value2) {
         result = 2;
     }
 
     // 結果と平均値を一緒に送信
-    io.emit("data", { result, meanValue });
-    console.log(`result: ${ result }, mean: ${meanValue} : ${getTime()}`);
+    io.emit("data", result);
+    console.log(`result: ${ result }, mean: ${mean} : ${getTime()}`);
 
     // 既存のファイルに追記
-    const csvLine = `${getTime()},${result},${meanValue}\n`;
+    const csvLine = `${getTime()},${result},${mean}\n`;
     fs.appendFileSync(currentPlaybackCSV, csvLine);
     console.log('Playback data saved');
 }, DELAY_TIME*1000);
 
+// 60秒ごとにM5StickのデータをCSVに保存
+setInterval(() => {
+    Object.keys(deviceData).forEach(id => {
+        deviceData[id].forEach(data => {
+            writeM5DataCSV(data.m5Time, data.id, data.normAcc, data.accX, data.accY, data.accZ);
+        });
+    });
+}, 60*1000);
+
 const io = setupWebSocketServer();
-setupTcpServer();
+setupTcpServer(io);
