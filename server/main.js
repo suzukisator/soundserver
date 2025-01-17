@@ -42,9 +42,10 @@ function setupWebSocketServer() {
             console.log('WebSocket client disconnected');
         });
     });
+    return io;
 }
 
-function setupTcpServer() {
+function setupTcpServer(io) {
     const tcpServer = net.createServer(socket => {
         console.log('TCP client connected', getTime());
         
@@ -145,5 +146,5 @@ setInterval(() => {
     });
 }, 60*1000);
 
-setupWebSocketServer();
-setupTcpServer();
+const io = setupWebSocketServer();
+setupTcpServer(io);
