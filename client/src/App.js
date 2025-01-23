@@ -30,6 +30,7 @@ function App() {
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const audioRef = useRef(null);
+    const [userInteracted, setUserInteracted] = useState(false);
 
     const formatTime = (timeInSeconds) => {
         const minutes = Math.floor(timeInSeconds / 60);
@@ -47,9 +48,7 @@ function App() {
         if (audioRef.current) {
             setDuration(audioRef.current.duration);
             audioRef.current.currentTime = audioPositions[currentMusicId] || 0;
-            audioRef.current.play().catch(error => {
-                console.error("Failed to play audio:", error);
-            });
+            playAudio();
         }
     };
 
@@ -65,12 +64,11 @@ function App() {
         setCurrentAudio(music);
         setCurrentMusicId(data);
 
+        // データを受信したら即座に再生
         if (audioRef.current) {
             audioRef.current.load();
             audioRef.current.volume = NORMALIZED_VOLUME;
-            audioRef.current.play().catch(error => {
-                console.error("Failed to play audio:", error);
-            });
+            playAudio();
         }
     }
 
@@ -114,6 +112,33 @@ function App() {
         };
     }, []);
 
+    useEffect(() => {
+        const handleInteraction = () => {
+            setUserInteracted(true);
+            // イベントリスナーを削除
+            document.removeEventListener('click', handleInteraction);
+            document.removeEventListener('keydown', handleInteraction);
+        };
+
+        document.addEventListener('click', handleInteraction);
+        document.addEventListener('keydown', handleInteraction);
+
+        return () => {
+            document.removeEventListener('click', handleInteraction);
+            document.removeEventListener('keydown', handleInteraction);
+        };
+    }, []);
+
+    const playAudio = async () => {
+        if (audioRef.current && userInteracted) {
+            try {
+                await audioRef.current.play();
+            } catch (error) {
+                console.error("Failed to play audio:", error);
+            }
+        }
+    };
+
     const handleAudioEnded = () => {
         // 音楽が終了したら、再生位置を0にリセットして再生を開始
         if (audioRef.current && currentMusicId !== null) {
@@ -129,6 +154,11 @@ function App() {
     return (
         <div className="App">
           <header className="App-header">
+            {!userInteracted && (
+                <div className="interaction-message">
+                    <p>画面をクリックして音声を有効にしてください</p>
+                </div>
+            )}
             <h1>信号による画像とBGMの切り替え</h1>
             {currentImage && <img src={currentImage} alt="Current" />}
             {currentAudio && (
