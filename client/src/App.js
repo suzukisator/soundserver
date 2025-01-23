@@ -24,9 +24,8 @@ const IMAGE2 = "/jupitor.jpg";
 const NORMALIZED_VOLUME = 0.5;
 
 function App() {
-	const [ currentImage, setCurrentImage ] = useState("");
-	const [ currentAudio, setCurrentAudio ] = useState("");
-    const [ playing, setPlaying ] = useState(false);
+    const [ currentImage, setCurrentImage ] = useState("");
+    const [ currentAudio, setCurrentAudio ] = useState("");
     const [currentMusicId, setCurrentMusicId] = useState(null);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -61,35 +60,17 @@ function App() {
             audioRef.current.pause();
         }
 
-        if (playlog.length === 1) {
-            console.log(`${data}の曲だけ`);
-            setCurrentImage(image);
-            setCurrentAudio(music);
-            setCurrentMusicId(data);
-            setPlaying(true);
-        } else if (playlog[0] === data && playlog[1] === data) {
-            console.log(`${data}の曲を続けて再生`);
-            if (audioRef.current) {
-                if (audioRef.current.paused) {
-                    audioRef.current.play().catch(error => {
-                        console.error("Failed to play audio:", error);
-                    });
-                } else {
-                    console.log("音楽は既に再生中です");
-                }
-            }
-        } else if (playlog[0] !== data && playlog[1] === data) {
-            console.log(`${data}の曲を再生`);
-            setCurrentImage(image);
-            setCurrentAudio(music);
-            setCurrentMusicId(data);
-            setPlaying(true);
-        }
+        // 新しい音楽をセットして再生
+        setCurrentImage(image);
+        setCurrentAudio(music);
+        setCurrentMusicId(data);
 
         if (audioRef.current) {
             audioRef.current.load();
-            // 音量を設定
             audioRef.current.volume = NORMALIZED_VOLUME;
+            audioRef.current.play().catch(error => {
+                console.error("Failed to play audio:", error);
+            });
         }
     }
 
@@ -104,8 +85,11 @@ function App() {
             if (playlog.length >= 2) {
                 playlog.shift();
             }
-            if (typeof(data) === Number && data >= 0 && data <= 2) {
-
+            // データをplaylogに追加
+            playlog.push(data);
+            
+            // 型チェックを修正
+            if (typeof(data) === 'number' && data >= 0 && data <= 2) {
                 // 音楽の切り替え処理
                 switch (data) {
                     case 0:
@@ -130,17 +114,6 @@ function App() {
         };
     }, []);
 
-    useEffect(() => {
-        if (playing && audioRef.current) {
-            audioRef.current.volume = NORMALIZED_VOLUME;
-            audioRef.current.play().catch(error => {
-                console.error("Failed to play audio:", error);
-            });
-        } else if (audioRef.current) {
-            audioRef.current.pause();
-        }
-    }, [playing, currentAudio]);
-
     const handleAudioEnded = () => {
         // 音楽が終了したら、再生位置を0にリセットして再生を開始
         if (audioRef.current && currentMusicId !== null) {
@@ -153,43 +126,33 @@ function App() {
         }
     };
 
-	const handlePlayButtonClick = () => {
-		if (audioRef.current) {
-		  audioRef.current.volume = NORMALIZED_VOLUME;
-		  audioRef.current.play().catch(error => {
-			console.error("Failed to play audio:", error);
-		  });
-		}
-	};
-
-	return (
-		<div className="App">
-		  <header className="App-header">
-			<h1>信号による画像とBGMの切り替え</h1>
-			{currentImage && <img src={currentImage} alt="Current" />}
-			{currentAudio && (
-			  <>
-				<audio
-				  ref={audioRef}
-				  src={currentAudio}
-				  onEnded={handleAudioEnded}
-				  onTimeUpdate={handleTimeUpdate}
-				  onLoadedMetadata={handleLoadedMetadata}
-				>
-				  お使いのブラウザはオーディオタグをサポートしていません。
-				</audio>
-				<div className="audio-controls">
-					<button onClick={handlePlayButtonClick}>再生</button>
-					<div className="time-display">
-						<span>{formatTime(currentTime)}</span>
-						<span> / </span>
-						<span>{formatTime(duration)}</span>
-					</div>
-				</div>
-			  </>
-			)}
-		  </header>
-		</div>
+    return (
+        <div className="App">
+          <header className="App-header">
+            <h1>信号による画像とBGMの切り替え</h1>
+            {currentImage && <img src={currentImage} alt="Current" />}
+            {currentAudio && (
+              <>
+                <audio
+                  ref={audioRef}
+                  src={currentAudio}
+                  onEnded={handleAudioEnded}
+                  onTimeUpdate={handleTimeUpdate}
+                  onLoadedMetadata={handleLoadedMetadata}
+                >
+                  お使いのブラウザはオーディオタグをサポートしていません。
+                </audio>
+                <div className="audio-controls">
+                    <div className="time-display">
+                        <span>{formatTime(currentTime)}</span>
+                        <span> / </span>
+                        <span>{formatTime(duration)}</span>
+                    </div>
+                </div>
+              </>
+            )}
+          </header>
+        </div>
     );
 }
 
