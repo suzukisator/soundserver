@@ -1,140 +1,59 @@
 #include <M5Unified.h>
 #include <Kalman.h>
 #include <WiFi.h>
-#include <vector>
 
 Kalman kalmanX, kalmanY, kalmanZ;
 WiFiClient wifiClient;
 
 // wifi設定
-const char* SSID = "aterm-a02caf-a";
-const char* PASSWORD = "69fbba1581ceb";
+const char* SSID = "Buffalo-G-1AF0";
+const char* PASSWORD  = "7nyh4sj46px64";
 
-const char* SERVER_IP = "192.168.10.2";
+const char* SERVER_IP = "192.168.11.11";
 const int SERVER_PORT = 3002;
-const int DEVICE_ID = 4;
+const int DEVICE_ID = 1;
 
-// グローバル変数の最適化
-struct {
-    float acc[3];
-    float gyro[3];
-    float kalacc[3] = {0, 0, 0};
-    float dt = 0;
-    unsigned long prevTime;
-    float battery = 100.0f;
-    bool display = true;
-    uint8_t displaycount = 0;
-    bool needScreenUpdate = true;
-    unsigned long lastWiFiCheck = 0;
-    unsigned long lastScreenUpdate = 0;
-    bool isSendingCachedData = false;
-} state;
-
-// データキャッシュ用の構造体
-struct CachedData {
-    float kalacc[3];
-    float timestamp;
-};
-
-// キャッシュされたデータを保存するベクター
-std::vector<CachedData> cachedData;
-const size_t MAX_CACHE_SIZE = 3000; // 5分（300秒）分のデータをキャッシュ可能
-
-// 定数の定義
-const unsigned long WIFI_CHECK_INTERVAL = 5000;    // WiFi接続チェック間隔（ms）
-const unsigned long SCREEN_UPDATE_INTERVAL = 200;  // 画面更新間隔（ms）
-const uint8_t LCD_BRIGHTNESS = 70;
-
+float acc[3], gyro[3], kalacc[3] = {0, 0, 0};
 float accnorm, dt = 0;
-unsigned long currentTime;
+unsigned long prevTime, currentTime;
+float battery = 100.0f;
+bool display = true;
+int displaycount = 0;
 
 void deltaTime(void) {
     currentTime = millis();
-    dt = (currentTime - state.prevTime) / 1000.0f;
-    state.prevTime = currentTime;
+    dt = (currentTime - prevTime) / 1000.0f;
+    prevTime = currentTime;
 }
 
 void getIMU(void) {
-    M5.Imu.getAccel(&state.acc[0], &state.acc[1], &state.acc[2]);
-    M5.Imu.getGyro(&state.gyro[0], &state.gyro[1], &state.gyro[2]);
+    M5.Imu.getAccel(&acc[0], &acc[1], &acc[2]);
+    M5.Imu.getGyro(&gyro[0], &gyro[1], &gyro[2]);
 }
 
 void kalmanAccel(void) {
-    state.kalacc[0] = kalmanX.getAngle(state.acc[0], state.gyro[0], dt);
-    state.kalacc[1] = kalmanY.getAngle(state.acc[1], state.gyro[1], dt);
-    state.kalacc[2] = kalmanZ.getAngle(state.acc[2], state.gyro[2], dt);
+    kalacc[0] = kalmanX.getAngle(acc[0], gyro[0], dt);
+    kalacc[1] = kalmanY.getAngle(acc[1], gyro[1], dt);
+    kalacc[2] = kalmanZ.getAngle(acc[2], gyro[2], dt);
 }
-
-void cacheData() {
-    if (cachedData.size() >= MAX_CACHE_SIZE) {
-        return; // キャッシュが一杯の場合は新しいデータを追加しない
-    }
-    
-    CachedData data;
-    memcpy(data.kalacc, state.kalacc, sizeof(float) * 3);
-    data.timestamp = millis() / 1000.0f;
-    cachedData.push_back(data);
-    
-    if (state.display) {
-        M5.Lcd.setTextSize(1);
-        M5.Lcd.setCursor(3, 150);
-        M5.Lcd.printf("Cached: %d", cachedData.size());
-        // 残り時間の表示（秒）
-        float remainingTime = (MAX_CACHE_SIZE - cachedData.size()) / 20.0f;  // 20Hz sampling rate
-        M5.Lcd.setCursor(3, 160);
-        M5.Lcd.printf("Remaining: %.1fs", remainingTime);
-    }
+/*
+void accelNorm(void) {
+    accnorm = sqrt(kalacc[0]*kalacc[0] + kalacc[1]*kalacc[1] + kalacc[2]*kalacc[2]);
 }
-
-void sendCachedData() {
-    if (cachedData.empty() || !wifiClient.connected()) {
-        state.isSendingCachedData = false;
-        return;
-    }
-    
-    state.isSendingCachedData = true;
-    
-    // 先頭のデータを送信
-    byte data[24];
-    *((int*)data) = DEVICE_ID;
-    *((float*)(data + 4)) = cachedData.front().kalacc[0];
-    *((float*)(data + 8)) = cachedData.front().kalacc[1];
-    *((float*)(data + 12)) = cachedData.front().kalacc[2];
-    *((float*)(data + 16)) = cachedData.front().timestamp;
-    
-    if (wifiClient.write(data, sizeof(data))) {
-        cachedData.erase(cachedData.begin()); // 送信成功したデータを削除
-    }
-    
-    if (state.display) {
-        M5.Lcd.setTextSize(1);
-        M5.Lcd.setCursor(3, 160);
-        M5.Lcd.printf("Sending cached: %d", cachedData.size());
-    }
-}
+*/
 
 void sendData(void) {
-    if (!wifiClient.connected()) {
-        cacheData();
-        return;
+    if (wifiClient.connected()) {
+        byte data[24];
+        float m5time = millis() / 1000.0f;
+        *((int*)data) = DEVICE_ID;
+        *((float*)(data + 4)) = kalacc[0];
+        *((float*)(data + 8)) = kalacc[1];
+        *((float*)(data + 12)) = kalacc[2];
+        *((float*)(data + 16)) = m5time;
+
+        wifiClient.write(data, sizeof(data));
     }
-    
-    // キャッシュされたデータがある場合、それを優先して送信
-    if (!cachedData.empty()) {
-        sendCachedData();
-        return;
-    }
-    
-    // 通常のデータ送信
-    byte data[24];
-    float m5time = millis() / 1000.0f;
-    *((int*)data) = DEVICE_ID;
-    *((float*)(data + 4)) = state.kalacc[0];
-    *((float*)(data + 8)) = state.kalacc[1];
-    *((float*)(data + 12)) = state.kalacc[2];
-    *((float*)(data + 16)) = m5time;
-    
-    wifiClient.write(data, sizeof(data));
 }
 
 void BasicInfo(void) {
@@ -168,20 +87,20 @@ void netWorkStatus(const char *wifistatus, const char *serverstatus) {
 
 void ConnectMonitor(void) {
     if (WiFi.status() != WL_CONNECTED) {
-        if (state.display) {
+        if (display) {
             netWorkStatus("No", "No");
         }
         return;
     }
 
     if (wifiClient.connected()) {
-        if (state.display) {
+        if (display) {
             netWorkStatus("Yes", "Yes");
         }
 
     } else {
         wifiClient.stop();
-        if (state.display) {
+        if (display) {
             netWorkStatus("Yes", "No");
         }
         wifiClient.connect(SERVER_IP, SERVER_PORT);
@@ -205,16 +124,16 @@ void batterycolor(int color1 , int color2, int color3, int color4, int color5) {
 }
 
 void VisualBattery(void) {
-    state.battery = M5.Power.getBatteryLevel();
-    if (state.battery > 80) {
+    battery = M5.Power.getBatteryLevel();
+    if (battery > 80) {
         batterycolor(GREEN, GREEN, GREEN, GREEN, GREEN);
-    } else if (80 >= state.battery && state.battery > 60) {
+    } else if (80 >= battery && battery > 60) {
         batterycolor(BLACK, GREEN, GREEN, GREEN, GREEN);
-    }else if (60 >= state.battery && state.battery > 40) {
+    }else if (60 >= battery && battery > 40) {
         batterycolor(BLACK, BLACK, GREEN, GREEN, GREEN);
-    }else if (40 >= state.battery && state.battery > 20) {
+    }else if (40 >= battery && battery > 20) {
         batterycolor(BLACK, BLACK, BLACK, GREEN, GREEN);
-    }else if (20 >= state.battery) {
+    }else if (20 >= battery) {
         batterycolor(BLACK, BLACK, BLACK, BLACK, GREEN);
     }
 }
@@ -233,13 +152,13 @@ void IMUprint(void) {
     M5.Lcd.setTextSize(2);
     M5.Lcd.fillRect(60,0,75,20,BLUE);
     M5.Lcd.setCursor(60,0);
-    M5.Lcd.println(state.kalacc[0],1);
+    M5.Lcd.println(kalacc[0],1);
     M5.Lcd.fillRect(60,20,75,20,RED);
     M5.Lcd.setCursor(60,20);
-    M5.Lcd.println(state.kalacc[1],1);
+    M5.Lcd.println(kalacc[1],1);
     M5.Lcd.fillRect(60,40,75,20,DARKGREEN);
     M5.Lcd.setCursor(60,40);
-    M5.Lcd.println(state.kalacc[2],1);
+    M5.Lcd.println(kalacc[2],1);
     M5.Lcd.fillRect(59,0,1,61,WHITE);
     M5.Lcd.fillRect(59,61,75,1,WHITE);
 }
@@ -271,19 +190,19 @@ void UpTime() {
 
 void screenControler(void) {
     if (M5.BtnA.isPressed()) {
-        if (state.displaycount == 0) {
-            state.display = false;
-            state.displaycount ++;
+        if (displaycount == 0) {
+            display = false;
+            displaycount ++;
             delay(100);
-        } else if (state.displaycount == 1) {
-            state.display = true;
-            state.displaycount = 0;
+        } else if (displaycount == 1) {
+            display = true;
+            displaycount = 0;
             delay(100);
         }
     }
 
-    if (state.display) {
-        M5.Lcd.setBrightness(LCD_BRIGHTNESS);
+    if (display) {
+        M5.Lcd.setBrightness(70);
         BasicInfo();
         IMUInfo();
         IMUprint();
@@ -309,7 +228,7 @@ void setup(void) {
 
     screenControler();
 
-    state.prevTime = millis();
+    prevTime = millis();
 }
 
 void loop(void) {
