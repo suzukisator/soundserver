@@ -48,12 +48,12 @@ function initializePlaybackCSV() {
     const filepath = path.join(dirPath, `${dateStr}_playback_${timeStr}.csv`);
 
     // 新しいファイルを作成してヘッダーを書き込む
-    fs.writeFileSync(filepath, "Timestamp,MusicID,MeanValue\n");
+    fs.writeFileSync(filepath, "Timestamp,MusicID,Mean\n");
     console.log(`Initialized playback CSV file: ${filepath}`);
     return filepath;
 }
 
-function writeM5DataCSV(receivedId, m5Time, normAcc, receivedAccX, receivedAccY, receivedAccZ) {
+function writeM5DataCSV(receivedId, m5Data) {
     try {
         const dirPath = path.join(__dirname, ".." ,"csv_data", `${getCSVTime()}`, `Device_${receivedId}`);
         if (!csvFiles[receivedId]) {
@@ -67,9 +67,8 @@ function writeM5DataCSV(receivedId, m5Time, normAcc, receivedAccX, receivedAccY,
             csvFiles[receivedId].write("Time,m5time,accNorm,accX,accY,accZ\n");
             console.log(`New CSV file created: ${filepath}`);
         }
+        csvFiles[receivedId].write(m5Data);
 
-        const csvLine = `${getTime()},${m5Time},${normAcc},${receivedAccX},${receivedAccY},${receivedAccZ}\n`;
-        csvFiles[receivedId].write(csvLine);
     } catch (error) {
         console.error('Error saving to CSV:', error);
     }
