@@ -8,9 +8,9 @@ import * as ss from 'simple-statistics';
 import { getLocalIP } from './getLocalIP.js';
 
 const WEB_SOCKET_PORT = 3001;
+const WEB_SOCKET_PORT2 = 3003;
 const TCP_PORT = 3002;
 const HOST = getLocalIP(); //IPアドレス
-
 
 const deviceData = {};
 const stdlist = [];
@@ -33,7 +33,7 @@ function setupWebSocketServer() {
 
     server.listen(WEB_SOCKET_PORT, () => {
         console.log(`WebSocket server listening on port ${WEB_SOCKET_PORT}`);
-    });
+    })
 
     io.on('connection', (socket) => {
         console.log('WebSocket client connected');
@@ -144,14 +144,18 @@ setInterval(() => {
 setInterval(() => {
     try {
         Object.keys(deviceData).forEach(id => {
+            let csvData = '';
             deviceData[id].forEach(data => {
-                writeM5DataCSV(data.m5Time, data.id, data.normAcc, data.accX, data.accY, data.accZ);
+                csvData += `${getTime()},${data.m5Time},${data.normAcc},${data.accX},${data.accY},${data.accZ}\n`;
             });
+            if (csvData) {
+                writeM5DataCSV(id, csvData);
+            }
         });
     } catch (error) {
         console.error('Error in setInterval:', error);
     }
-}, 60*1000);
+}, 30*1000);
 
 const io = setupWebSocketServer();
 setupTcpServer(io);
