@@ -107,13 +107,15 @@ function setupTcpServer(io) {
 setInterval(() => {
     try {
         Object.keys(deviceData).forEach(id => {
-            const std = ss.standardDeviation(deviceData[id].map(data => data.normAcc));
-            //const median = ss.median(deviceData[id]);
-            // NaNでない場合のみstdlistに追加
-            if (!(isNaN(std) || std === 0)) {
-                stdlist.push(std);
+            if (deviceData[id].length > 0) {
+                const std = ss.standardDeviation(deviceData[id].map(data => data.normAcc));
+                //const median = ss.median(deviceData[id]);
+                // NaNでない場合のみstdlistに追加
+                if (!(isNaN(std) || std === 0)) {
+                    stdlist.push(std);
+                }
+                deviceData[id] = [];
             }
-            deviceData[id] = [];
         });
         console.log(stdlist);
         const mean = ss.mean(stdlist);
