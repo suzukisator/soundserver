@@ -78,6 +78,8 @@ function setupTcpServer(io) {
                     deviceData[receivedId] = [];
                 }
                 deviceData[receivedId].push(m5Data);
+                const csvData = `${getTime()},${m5Time},${normAcc},${receivedAccX},${receivedAccY},${receivedAccZ}\n`;
+                writeM5DataCSV(receivedId, csvData);
             }
         });
 
@@ -139,23 +141,6 @@ setInterval(() => {
         console.error('Error in setInterval:', error);
     }
 }, DELAY_TIME*1000);
-
-// 60秒ごとにM5StickのデータをCSVに保存
-setInterval(() => {
-    try {
-        Object.keys(deviceData).forEach(id => {
-            let csvData = '';
-            deviceData[id].forEach(data => {
-                csvData += `${getTime()},${data.m5Time},${data.normAcc},${data.accX},${data.accY},${data.accZ}\n`;
-            });
-            if (csvData) {
-                writeM5DataCSV(id, csvData);
-            }
-        });
-    } catch (error) {
-        console.error('Error in setInterval:', error);
-    }
-}, 30*1000);
 
 const io = setupWebSocketServer();
 setupTcpServer(io);
