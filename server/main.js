@@ -8,7 +8,6 @@ import * as ss from 'simple-statistics';
 import { getLocalIP } from './getLocalIP.js';
 
 const WEB_SOCKET_PORT = 3001;
-const WEB_SOCKET_PORT2 = 3003;
 const TCP_PORT = 3002;
 const HOST = getLocalIP(); //IPアドレス
 
