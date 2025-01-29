@@ -9,7 +9,7 @@ WiFiClient wifiClient;
 const char* SSID = "Buffalo-G-1AF0";
 const char* PASSWORD  = "7nyh4sj46px64";
 
-const char* SERVER_IP = "192.168.11.11";
+const char* SERVER_IP = "192.168.11.7";
 const int SERVER_PORT = 3002;
 const int DEVICE_ID = 1;
 
